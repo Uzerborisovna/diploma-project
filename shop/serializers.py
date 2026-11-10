@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import (
     Shop, Category, Product, ProductParameter,
-    Order, OrderItem, Contact
+    Order, OrderItem, Contact, Cart, CartItem
 )
 
 
@@ -18,17 +18,22 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'password', 'first_name', 'last_name')
+        fields = ('id', 'email', 'password', 'first_name', 'last_name')
 
     def create(self, validated_data):
         user = User.objects.create_user(
-            username=validated_data['username'],
-            email=validated_data.get('email', ''),
+            username=validated_data['email'],
+            email=validated_data['email'],
             password=validated_data['password'],
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', '')
         )
         return user
+
+
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
 
 
 class ShopSerializer(serializers.ModelSerializer):
@@ -63,7 +68,25 @@ class ProductSerializer(serializers.ModelSerializer):
 class ContactSerializer(serializers.ModelSerializer):
     class Meta:
         model = Contact
-        fields = ('id', 'city', 'street', 'house', 'apartment', 'phone')
+        fields = ('id', 'last_name', 'first_name', 'middle_name',
+                  'email', 'phone', 'address', 'city', 'street',
+                  'house', 'building', 'structure', 'apartment')
+
+
+class CartItemSerializer(serializers.ModelSerializer):
+    product = ProductSerializer(read_only=True)
+
+    class Meta:
+        model = CartItem
+        fields = ('id', 'product', 'quantity')
+
+
+class CartSerializer(serializers.ModelSerializer):
+    items = CartItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Cart
+        fields = ('id', 'items')
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
@@ -77,6 +100,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     user = UserSerializer(read_only=True)
+    contact = ContactSerializer(read_only=True)
 
     class Meta:
         model = Order

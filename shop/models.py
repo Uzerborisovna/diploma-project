@@ -1,7 +1,4 @@
 from django.db import models
-
-# Create your models here.
-from django.db import models
 from django.contrib.auth.models import User
 
 
@@ -63,11 +60,58 @@ class ProductParameter(models.Model):
         return f'{self.name}: {self.value}'
 
 
+class Contact(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='contacts', verbose_name='Пользователь')
+    last_name = models.CharField(max_length=100, default='', verbose_name='Фамилия')
+    first_name = models.CharField(max_length=100, default='', verbose_name='Имя')
+    middle_name = models.CharField(max_length=100, blank=True, null=True, verbose_name='Отчество')
+    email = models.EmailField(default='default@example.com', verbose_name='Email')
+    phone = models.CharField(max_length=20, default='', verbose_name='Телефон')
+    address = models.CharField(max_length=200, default='', verbose_name='Адрес')
+    city = models.CharField(max_length=100, default='', verbose_name='Город')
+    street = models.CharField(max_length=200, default='', verbose_name='Улица')
+    house = models.CharField(max_length=50, default='', verbose_name='Дом')
+    building = models.CharField(max_length=50, blank=True, null=True, verbose_name='Корпус')
+    structure = models.CharField(max_length=50, blank=True, null=True, verbose_name='Строение')
+    apartment = models.CharField(max_length=50, blank=True, null=True, verbose_name='Квартира')
+
+    class Meta:
+        verbose_name = 'Контакт'
+        verbose_name_plural = 'Контакты'
+
+    def __str__(self):
+        return f'{self.city}, {self.street}, {self.house}'
+
+
+class Cart(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='cart', verbose_name='Пользователь')
+
+    class Meta:
+        verbose_name = 'Корзина'
+        verbose_name_plural = 'Корзины'
+
+    def __str__(self):
+        return f'Корзина {self.user.username}'
+
+
+class CartItem(models.Model):
+    cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='items', verbose_name='Корзина')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, verbose_name='Товар')
+    quantity = models.PositiveIntegerField(default=1, verbose_name='Количество')
+
+    class Meta:
+        verbose_name = 'Позиция корзины'
+        verbose_name_plural = 'Позиции корзины'
+
+    def __str__(self):
+        return f'{self.product.name} x {self.quantity}'
+
+
 class Order(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders', verbose_name='Пользователь')
+    contact = models.ForeignKey(Contact, on_delete=models.SET_NULL, null=True, verbose_name='Контакт')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
     state = models.CharField(max_length=50, default='new', verbose_name='Статус заказа')
-    contact = models.CharField(max_length=100, blank=True, null=True, verbose_name='Контакт')
 
     class Meta:
         verbose_name = 'Заказ'
@@ -91,19 +135,3 @@ class OrderItem(models.Model):
 
     def __str__(self):
         return f'{self.product.name} x {self.quantity}'
-
-
-class Contact(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='contacts', verbose_name='Пользователь')
-    city = models.CharField(max_length=100, verbose_name='Город')
-    street = models.CharField(max_length=200, verbose_name='Улица')
-    house = models.CharField(max_length=50, verbose_name='Дом')
-    apartment = models.CharField(max_length=50, blank=True, null=True, verbose_name='Квартира')
-    phone = models.CharField(max_length=20, verbose_name='Телефон')
-
-    class Meta:
-        verbose_name = 'Контакт'
-        verbose_name_plural = 'Контакты'
-
-    def __str__(self):
-        return f'{self.city}, {self.street}, {self.house}'
