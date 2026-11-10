@@ -1,0 +1,22 @@
+shop: "Магазин на диване"
+categories:
+  Электроника:
+    - name: "Смартфон"
+      price: 50000
+      quantity: 10
+      parameters:
+        color: "Черный"
+        memory: "128 ГБ"
+    - name: "Ноутбук"
+      price: 80000
+      quantity: 5
+      parameters:
+        color: "Серебристый"
+        memory: "16 ГБ"
+  Одежда:
+    - name: "Футболка"
+      price: 1500
+      quantity: 100
+      parameters:
+        size: "L"
+        color: "Белый"
