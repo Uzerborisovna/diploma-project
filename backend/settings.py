@@ -12,9 +12,15 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 
 from pathlib import Path
 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-7z3bk*%r2lt22&(zr763ge=0@ci1_tpl3@9$f_b(13ygubffv-'
+SECRET_KEY = os.getenv('SECRET_KEY')
 
 DEBUG = True
 
