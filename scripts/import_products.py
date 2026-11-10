@@ -16,28 +16,31 @@ def import_from_yaml(file_path):
     shop_name = data['shop']
     shop, _ = Shop.objects.get_or_create(name=shop_name)
     
-    for category_name, products in data['categories'].items():
-        category, _ = Category.objects.get_or_create(name=category_name)
+    categories_dict = {}
+    for cat in data['categories']:
+        category, _ = Category.objects.get_or_create(name=cat['name'])
         category.shops.add(shop)
+        categories_dict[cat['id']] = category
         
-        for product_data in products:
-            product, _ = Product.objects.update_or_create(
-                name=product_data['name'],
-                shop=shop,
-                defaults={
-                    'category': category,
-                    'price': product_data['price'],
-                    'quantity': product_data.get('quantity', 0),
-                }
+    for good in data['goods']:
+        category = categories_dict.get(good['category'])
+        
+        product, _ = Product.objects.update_or_create(
+            name=good['name'],
+            shop=shop,
+            defaults={
+                'category': category,
+                'price': good['price'],
+                'quantity': good.get('quantity', 0),
+            }
+        )
+        
+        for param_name, param_value in good.get('parameters', {}).items():
+            ProductParameter.objects.update_or_create(
+                product=product,
+                name=param_name,
+                defaults={'value': str(param_value)}
             )
-            
-            if 'parameters' in product_data:
-                for param_name, param_value in product_data['parameters'].items():
-                    ProductParameter.objects.update_or_create(
-                        product=product,
-                        name=param_name,
-                        defaults={'value': param_value}
-                    )
     
     print(f"Импорт из {file_path} завершен.")
 
