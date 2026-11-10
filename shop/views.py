@@ -13,7 +13,7 @@ from .serializers import (
     RegisterSerializer, UserSerializer, ContactSerializer,
     OrderSerializer
 )
-
+from django.core.mail import send_mail
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -95,15 +95,35 @@ class OrderCreateView(APIView):
         order = Order.objects.create(user=request.user, contact=contact)
         
         cart_items = request.data.get('items', [])
+        items_text = ""
         for item in cart_items:
             product = get_object_or_404(Product, id=item['product_id'])
-            OrderItem.objects.create(
+            order_item = OrderItem.objects.create(
                 order=order,
                 product=product,
                 shop=product.shop,
                 quantity=item['quantity'],
                 price=product.price
             )
+            items_text += f"{product.name} (x{item['quantity']}) - {product.price} руб.\n"
+        
+        # Письмо клиенту
+        send_mail(
+            subject=f'Подтверждение заказа №{order.id}',
+            message=f'Спасибо за заказ! Ваш заказ №{order.id} принят.',
+            from_email=None,
+            recipient_list=[request.user.email],
+            fail_silently=False,
+        )
+        
+        # Письмо администратору (накладная)
+        send_mail(
+            subject=f'Накладная по заказу №{order.id}',
+            message=f'Поступил новый заказ №{order.id} от {request.user.username}.\n\nТовары:\n{items_text}',
+            from_email=None,
+            recipient_list=['admin@diploma-project.local'],
+            fail_silently=False,
+        )
         
         serializer = OrderSerializer(order)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
