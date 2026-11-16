@@ -32,11 +32,6 @@ class Category(models.Model):
 class Product(models.Model):
     name = models.CharField(max_length=200, verbose_name='Название товара')
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products', verbose_name='Категория')
-    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name='products', verbose_name='Магазин')
-    description = models.TextField(blank=True, null=True, verbose_name='Описание')
-    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Цена')
-    quantity = models.PositiveIntegerField(default=0, verbose_name='Количество')
-    is_active = models.BooleanField(default=True, verbose_name='Активен')
 
     class Meta:
         verbose_name = 'Товар'
@@ -44,11 +39,30 @@ class Product(models.Model):
         ordering = ('name',)
 
     def __str__(self):
-        return f'{self.name} ({self.shop.name})'
+        return self.name
+
+
+class ProductInfo(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='product_infos', verbose_name='Товар')
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name='product_infos', verbose_name='Магазин')
+    external_id = models.PositiveIntegerField(verbose_name='ID товара в магазине')
+    model = models.CharField(max_length=200, verbose_name='Артикул')
+    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Цена')
+    price_rrc = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Рекомендуемая розничная цена')
+    quantity = models.PositiveIntegerField(default=0, verbose_name='Количество')
+    description = models.TextField(blank=True, null=True, verbose_name='Описание')
+
+    class Meta:
+        verbose_name = 'Информация о товаре'
+        verbose_name_plural = 'Информация о товарах'
+        unique_together = ('product', 'shop', 'external_id')
+
+    def __str__(self):
+        return f'{self.product.name} ({self.shop.name})'
 
 
 class ProductParameter(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='parameters', verbose_name='Товар')
+    product_info = models.ForeignKey(ProductInfo, on_delete=models.CASCADE, related_name='parameters', verbose_name='Информация о товаре')
     name = models.CharField(max_length=100, verbose_name='Характеристика')
     value = models.CharField(max_length=200, verbose_name='Значение')
 
@@ -83,35 +97,11 @@ class Contact(models.Model):
         return f'{self.city}, {self.street}, {self.house}'
 
 
-class Cart(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='cart', verbose_name='Пользователь')
-
-    class Meta:
-        verbose_name = 'Корзина'
-        verbose_name_plural = 'Корзины'
-
-    def __str__(self):
-        return f'Корзина {self.user.username}'
-
-
-class CartItem(models.Model):
-    cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='items', verbose_name='Корзина')
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, verbose_name='Товар')
-    quantity = models.PositiveIntegerField(default=1, verbose_name='Количество')
-
-    class Meta:
-        verbose_name = 'Позиция корзины'
-        verbose_name_plural = 'Позиции корзины'
-
-    def __str__(self):
-        return f'{self.product.name} x {self.quantity}'
-
-
 class Order(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders', verbose_name='Пользователь')
     contact = models.ForeignKey(Contact, on_delete=models.SET_NULL, null=True, verbose_name='Контакт')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
-    state = models.CharField(max_length=50, default='new', verbose_name='Статус заказа')
+    state = models.CharField(max_length=50, default='basket', verbose_name='Статус заказа')
 
     class Meta:
         verbose_name = 'Заказ'
@@ -124,14 +114,21 @@ class Order(models.Model):
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items', verbose_name='Заказ')
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, verbose_name='Товар')
-    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, verbose_name='Магазин')
+    product_info = models.ForeignKey(ProductInfo, on_delete=models.CASCADE, verbose_name='Информация о товаре')
     quantity = models.PositiveIntegerField(default=1, verbose_name='Количество')
-    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Цена')
 
     class Meta:
         verbose_name = 'Позиция заказа'
         verbose_name_plural = 'Позиции заказа'
 
     def __str__(self):
-        return f'{self.product.name} x {self.quantity}'
+        return f'{self.product_info.product.name} x {self.quantity}'
+
+
+class ConfirmEmailToken(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='confirm_email_token')
+    token = models.CharField(max_length=100, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'Токен для {self.user.email}'

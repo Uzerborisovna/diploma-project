@@ -11,20 +11,22 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 from pathlib import Path
-
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv('SECRET_KEY')
 
+if not SECRET_KEY:
+    # Fallback для разработки, если .env не создан
+    SECRET_KEY = 'django-insecure-7z3bk*%r2lt22&(zr763ge=0@ci1_tpl3@9$f_b(13ygubffv-'
+
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -35,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework.authtoken',
+    'django_rest_passwordreset',
     'shop',
 ]
 
@@ -106,5 +109,9 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
     ],
 }
+
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_FROM_EMAIL = 'noreply@diploma-project.local'
+
+DJANGO_REST_MULTITOKENAUTH_RESET_TOKEN_EXPIRY_TIME = 24
+DJANGO_REST_PASSWORDRESET_NO_INFORMATION_LEAKAGE = True
