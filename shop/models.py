@@ -61,17 +61,29 @@ class ProductInfo(models.Model):
         return f'{self.product.name} ({self.shop.name})'
 
 
+class Parameter(models.Model):
+    name = models.CharField(max_length=100, unique=True, verbose_name='Название характеристики')
+
+    class Meta:
+        verbose_name = 'Характеристика'
+        verbose_name_plural = 'Характеристики'
+
+    def __str__(self):
+        return self.name
+
+
 class ProductParameter(models.Model):
     product_info = models.ForeignKey(ProductInfo, on_delete=models.CASCADE, related_name='parameters', verbose_name='Информация о товаре')
-    name = models.CharField(max_length=100, verbose_name='Характеристика')
+    parameter = models.ForeignKey(Parameter, on_delete=models.CASCADE, related_name='product_parameters', verbose_name='Характеристика')
     value = models.CharField(max_length=200, verbose_name='Значение')
 
     class Meta:
-        verbose_name = 'Характеристика товара'
-        verbose_name_plural = 'Характеристики товаров'
+        verbose_name = 'Значение характеристики'
+        verbose_name_plural = 'Значения характеристик'
+        unique_together = ('product_info', 'parameter')
 
     def __str__(self):
-        return f'{self.name}: {self.value}'
+        return f'{self.parameter.name}: {self.value}'
 
 
 class Contact(models.Model):
@@ -98,10 +110,18 @@ class Contact(models.Model):
 
 
 class Order(models.Model):
+    STATUS_CHOICES = [
+        ('basket', 'Корзина'),
+        ('new', 'Новый'),
+        ('confirmed', 'Подтвержден'),
+        ('delivered', 'Доставлен'),
+        ('cancelled', 'Отменен'),
+    ]
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders', verbose_name='Пользователь')
     contact = models.ForeignKey(Contact, on_delete=models.SET_NULL, null=True, verbose_name='Контакт')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
-    state = models.CharField(max_length=50, default='basket', verbose_name='Статус заказа')
+    state = models.CharField(max_length=50, choices=STATUS_CHOICES, default='basket', verbose_name='Статус заказа')
 
     class Meta:
         verbose_name = 'Заказ'
@@ -123,12 +143,3 @@ class OrderItem(models.Model):
 
     def __str__(self):
         return f'{self.product_info.product.name} x {self.quantity}'
-
-
-class ConfirmEmailToken(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='confirm_email_token')
-    token = models.CharField(max_length=100, unique=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f'Токен для {self.user.email}'

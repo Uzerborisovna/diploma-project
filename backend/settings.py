@@ -24,8 +24,10 @@ if not SECRET_KEY:
     # Fallback для разработки, если .env не создан
     SECRET_KEY = 'django-insecure-7z3bk*%r2lt22&(zr763ge=0@ci1_tpl3@9$f_b(13ygubffv-'
 
+# В продакшене DEBUG должен быть False
 DEBUG = True
 
+# В продакшене нужно указать конкретные домены
 ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [

@@ -1,10 +1,12 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
-import uuid
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode
+from django.utils.encoding import force_bytes
 from .models import (
-    Shop, Category, Product, ProductInfo, ProductParameter,
-    Order, OrderItem, Contact, ConfirmEmailToken
+    Shop, Category, Product, ProductInfo, Parameter, ProductParameter,
+    Order, OrderItem, Contact
 )
 
 
@@ -31,12 +33,13 @@ class RegisterSerializer(serializers.ModelSerializer):
             last_name=validated_data.get('last_name', ''),
             is_active=False
         )
-        token = str(uuid.uuid4())
-        ConfirmEmailToken.objects.create(user=user, token=token)
+
+        token = default_token_generator.make_token(user)
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
 
         send_mail(
             subject='Подтверждение регистрации',
-            message=f'Ваш токен для подтверждения: {token}',
+            message=f'Ваш токен для подтверждения: {token}\nВаш uid: {uid}',
             from_email=None,
             recipient_list=[user.email],
             fail_silently=True,
@@ -46,7 +49,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class ConfirmEmailSerializer(serializers.Serializer):
-    email = serializers.EmailField()
+    uid = serializers.CharField()
     token = serializers.CharField()
 
 
@@ -67,10 +70,18 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = ('id', 'name')
 
 
+class ParameterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Parameter
+        fields = ('id', 'name')
+
+
 class ProductParameterSerializer(serializers.ModelSerializer):
+    parameter = ParameterSerializer(read_only=True)
+
     class Meta:
         model = ProductParameter
-        fields = ('id', 'name', 'value')
+        fields = ('id', 'parameter', 'value')
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -91,18 +102,20 @@ class ProductInfoSerializer(serializers.ModelSerializer):
 
 
 class ContactSerializer(serializers.ModelSerializer):
+    last_name = serializers.CharField(required=True)
+    first_name = serializers.CharField(required=True)
+    email = serializers.EmailField(required=True)
+    phone = serializers.CharField(required=True)
+    address = serializers.CharField(required=True)
+    city = serializers.CharField(required=True)
+    street = serializers.CharField(required=True)
+    house = serializers.CharField(required=True)
+
     class Meta:
         model = Contact
         fields = ('id', 'last_name', 'first_name', 'middle_name',
                   'email', 'phone', 'address', 'city', 'street',
                   'house', 'building', 'structure', 'apartment')
-
-    def validate(self, data):
-        required_fields = ['last_name', 'first_name', 'email', 'phone', 'address', 'city', 'street', 'house']
-        for field in required_fields:
-            if not data.get(field):
-                raise serializers.ValidationError(f'Поле "{field}" обязательно для заполнения')
-        return data
 
 
 class OrderItemSerializer(serializers.ModelSerializer):

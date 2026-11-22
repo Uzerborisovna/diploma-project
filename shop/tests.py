@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.contrib.auth.models import User
 from rest_framework.test import APIClient
 from rest_framework import status
-from .models import Shop, Category, Product, ProductInfo, Contact, Order
+from .models import Shop, Category, Product, ProductInfo, Contact, Order, OrderItem
 
 
 class ShopAPITestCase(TestCase):
@@ -56,6 +56,13 @@ class ShopAPITestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('token', response.data)
 
+    def test_login_invalid_credentials(self):
+        response = self.client.post('/api/login/', {
+            'email': 'test@example.com',
+            'password': 'wrong'
+        })
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
     def test_product_list(self):
         response = self.client.get('/api/products/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -74,3 +81,31 @@ class ShopAPITestCase(TestCase):
         })
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(Order.objects.filter(user=self.user, state='new').exists())
+
+    def test_create_order_empty_cart(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post('/api/orders/create/', {
+            'contact_id': self.contact.id
+        })
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_create_order_invalid_contact(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post('/api/cart/', {
+            'product_info_id': self.product_info.id,
+            'quantity': 2
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        response = self.client.post('/api/orders/create/', {
+            'contact_id': 999
+        })
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_invalid_quantity(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post('/api/cart/', {
+            'product_info_id': self.product_info.id,
+            'quantity': 'abc'
+        })
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

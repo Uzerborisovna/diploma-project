@@ -7,7 +7,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
 django.setup()
 
-from shop.models import Shop, Category, Product, ProductInfo, ProductParameter
+from shop.models import Shop, Category, Product, ProductInfo, Parameter, ProductParameter
 
 
 def import_from_yaml(file_path):
@@ -43,11 +43,15 @@ def import_from_yaml(file_path):
             }
         )
 
+        # Удаляем старые параметры перед записью новых
+        product_info.parameters.all().delete()
+
         for param_name, param_value in good.get('parameters', {}).items():
-            ProductParameter.objects.update_or_create(
+            parameter, _ = Parameter.objects.get_or_create(name=param_name)
+            ProductParameter.objects.create(
                 product_info=product_info,
-                name=param_name,
-                defaults={'value': str(param_value)}
+                parameter=parameter,
+                value=str(param_value)
             )
 
     print(f"Импорт из {file_path} завершен.")

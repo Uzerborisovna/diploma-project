@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
-    Shop, Category, Product, ProductInfo, ProductParameter,
-    Contact, Order, OrderItem, ConfirmEmailToken
+    Shop, Category, Product, ProductInfo, Parameter, ProductParameter,
+    Contact, Order, OrderItem
 )
 
 
@@ -26,9 +26,14 @@ class ProductInfoAdmin(admin.ModelAdmin):
     list_display = ('id', 'product', 'shop', 'price', 'quantity')
 
 
+@admin.register(Parameter)
+class ParameterAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')
+
+
 @admin.register(ProductParameter)
 class ProductParameterAdmin(admin.ModelAdmin):
-    list_display = ('id', 'product_info', 'name', 'value')
+    list_display = ('id', 'product_info', 'parameter', 'value')
 
 
 @admin.register(Contact)
@@ -45,8 +50,3 @@ class OrderAdmin(admin.ModelAdmin):
 @admin.register(OrderItem)
 class OrderItemAdmin(admin.ModelAdmin):
     list_display = ('id', 'order', 'product_info', 'quantity')
-
-
-@admin.register(ConfirmEmailToken)
-class ConfirmEmailTokenAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'token', 'created_at')

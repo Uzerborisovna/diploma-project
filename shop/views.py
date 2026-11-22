@@ -5,12 +5,15 @@ from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_decode
+from django.utils.encoding import force_str
 from django.shortcuts import get_object_or_404
 from django.core.mail import send_mail
-import uuid
+from django.db import transaction
 from .models import (
     Product, ProductInfo, Category, Shop, Contact,
-    Order, OrderItem, ConfirmEmailToken
+    Order, OrderItem
 )
 from .serializers import (
     ProductInfoSerializer, CategorySerializer, ShopSerializer,
@@ -31,17 +34,19 @@ class ConfirmEmailView(APIView):
     def post(self, request):
         serializer = ConfirmEmailSerializer(data=request.data)
         if serializer.is_valid():
-            email = serializer.validated_data['email']
+            uid = serializer.validated_data['uid']
             token = serializer.validated_data['token']
             try:
-                user = User.objects.get(email=email)
-                confirm_token = ConfirmEmailToken.objects.get(user=user, token=token)
-                user.is_active = True
-                user.save()
-                confirm_token.delete()
-                return Response({'Status': True})
-            except (User.DoesNotExist, ConfirmEmailToken.DoesNotExist):
-                return Response({'Status': False, 'Errors': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
+                user_id = force_str(urlsafe_base64_decode(uid))
+                user = User.objects.get(pk=user_id)
+                if default_token_generator.check_token(user, token):
+                    user.is_active = True
+                    user.save()
+                    return Response({'Status': True})
+                else:
+                    return Response({'Status': False, 'Errors': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
+            except (User.DoesNotExist, ValueError, TypeError):
+                return Response({'Status': False, 'Errors': 'Invalid uid'}, status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -120,7 +125,12 @@ class CartView(APIView):
     def post(self, request):
         order, _ = Order.objects.get_or_create(user=request.user, state='basket')
         product_info_id = request.data.get('product_info_id')
-        quantity = int(request.data.get('quantity', 1))
+
+        try:
+            quantity = int(request.data.get('quantity', 1))
+        except (ValueError, TypeError):
+            return Response({'Status': False, 'Errors': 'Quantity must be an integer'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         product_info = get_object_or_404(ProductInfo, id=product_info_id)
 
@@ -172,26 +182,28 @@ class OrderCreateView(APIView):
 
         contact = get_object_or_404(Contact, id=contact_id, user=request.user)
 
-        order, _ = Order.objects.get_or_create(user=request.user, state='basket')
-        order_items = order.items.all()
+        with transaction.atomic():
+            order, _ = Order.objects.get_or_create(user=request.user, state='basket')
+            order_items = order.items.all()
 
-        if not order_items:
-            return Response({'Status': False, 'Errors': 'Cart is empty'}, status=status.HTTP_400_BAD_REQUEST)
+            if not order_items:
+                return Response({'Status': False, 'Errors': 'Cart is empty'}, status=status.HTTP_400_BAD_REQUEST)
 
-        items_text = "\n".join(
-            [f"{item.product_info.product.name} (x{item.quantity}) - {item.product_info.price} руб." for item in
-             order_items])
+            items_text = "\n".join(
+                [f"{item.product_info.product.name} (x{item.quantity}) - {item.product_info.price} руб." for item in
+                 order_items])
 
-        for item in order_items:
-            if item.product_info.quantity < item.quantity:
-                return Response({'Status': False, 'Errors': f'Not enough {item.product_info.product.name}'},
-                                status=status.HTTP_400_BAD_REQUEST)
-            item.product_info.quantity -= item.quantity
-            item.product_info.save()
+            for item in order_items:
+                product_info = ProductInfo.objects.select_for_update().get(id=item.product_info.id)
+                if product_info.quantity < item.quantity:
+                    return Response({'Status': False, 'Errors': f'Not enough {product_info.product.name}'},
+                                    status=status.HTTP_400_BAD_REQUEST)
+                product_info.quantity -= item.quantity
+                product_info.save()
 
-        order.contact = contact
-        order.state = 'new'
-        order.save()
+            order.contact = contact
+            order.state = 'new'
+            order.save()
 
         try:
             send_mail(
@@ -220,12 +232,19 @@ class OrderStatusUpdateView(APIView):
 
     def patch(self, request, pk):
         order = get_object_or_404(Order, id=pk)
+
         if not request.user.is_staff and order.user != request.user:
             return Response({'Status': False, 'Errors': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
 
         new_state = request.data.get('state')
-        if new_state:
-            order.state = new_state
-            order.save()
-            return Response({'Status': True})
-        return Response({'Status': False, 'Errors': 'state is required'}, status=status.HTTP_400_BAD_REQUEST)
+        if not new_state:
+            return Response({'Status': False, 'Errors': 'state is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not request.user.is_staff:
+            if new_state != 'cancelled':
+                return Response({'Status': False, 'Errors': 'You can only cancel your order'},
+                                status=status.HTTP_403_FORBIDDEN)
+
+        order.state = new_state
+        order.save()
+        return Response({'Status': True})
