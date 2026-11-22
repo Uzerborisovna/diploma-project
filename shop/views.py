@@ -3,23 +3,21 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
-from django.contrib.auth.models import User
-from django.contrib.auth import authenticate
-from django.contrib.auth.tokens import default_token_generator
-from django.utils.http import urlsafe_base64_decode
-from django.utils.encoding import force_str
+from django.contrib.auth import authenticate, get_user_model
 from django.shortcuts import get_object_or_404
 from django.core.mail import send_mail
 from django.db import transaction
 from .models import (
     Product, ProductInfo, Category, Shop, Contact,
-    Order, OrderItem
+    Order, OrderItem, ConfirmEmailToken
 )
 from .serializers import (
     ProductInfoSerializer, CategorySerializer, ShopSerializer,
     RegisterSerializer, UserSerializer, ContactSerializer,
     OrderSerializer, LoginSerializer, ConfirmEmailSerializer
 )
+
+User = get_user_model()
 
 
 class RegisterView(generics.CreateAPIView):
@@ -34,19 +32,17 @@ class ConfirmEmailView(APIView):
     def post(self, request):
         serializer = ConfirmEmailSerializer(data=request.data)
         if serializer.is_valid():
-            uid = serializer.validated_data['uid']
+            email = serializer.validated_data['email']
             token = serializer.validated_data['token']
             try:
-                user_id = force_str(urlsafe_base64_decode(uid))
-                user = User.objects.get(pk=user_id)
-                if default_token_generator.check_token(user, token):
-                    user.is_active = True
-                    user.save()
-                    return Response({'Status': True})
-                else:
-                    return Response({'Status': False, 'Errors': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
-            except (User.DoesNotExist, ValueError, TypeError):
-                return Response({'Status': False, 'Errors': 'Invalid uid'}, status=status.HTTP_400_BAD_REQUEST)
+                user = User.objects.get(email=email)
+                confirm_token = ConfirmEmailToken.objects.get(user=user, key=token)
+                user.is_active = True
+                user.save()
+                confirm_token.delete()
+                return Response({'Status': True})
+            except (User.DoesNotExist, ConfirmEmailToken.DoesNotExist):
+                return Response({'Status': False, 'Errors': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -184,7 +180,7 @@ class OrderCreateView(APIView):
 
         with transaction.atomic():
             order, _ = Order.objects.get_or_create(user=request.user, state='basket')
-            order_items = order.items.all()
+            order_items = order.ordered_items.all()
 
             if not order_items:
                 return Response({'Status': False, 'Errors': 'Cart is empty'}, status=status.HTTP_400_BAD_REQUEST)
@@ -241,7 +237,7 @@ class OrderStatusUpdateView(APIView):
             return Response({'Status': False, 'Errors': 'state is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         if not request.user.is_staff:
-            if new_state != 'cancelled':
+            if new_state != 'canceled':
                 return Response({'Status': False, 'Errors': 'You can only cancel your order'},
                                 status=status.HTTP_403_FORBIDDEN)
 

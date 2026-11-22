@@ -43,8 +43,7 @@ def import_from_yaml(file_path):
             }
         )
 
-        # Удаляем старые параметры перед записью новых
-        product_info.parameters.all().delete()
+        product_info.product_parameters.all().delete()
 
         for param_name, param_value in good.get('parameters', {}).items():
             parameter, _ = Parameter.objects.get_or_create(name=param_name)

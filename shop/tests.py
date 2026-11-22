@@ -1,17 +1,20 @@
 from django.test import TestCase
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from rest_framework import status
 from .models import Shop, Category, Product, ProductInfo, Contact, Order, OrderItem
+
+User = get_user_model()
 
 
 class ShopAPITestCase(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.user = User.objects.create_user(
-            username='test@example.com',
             email='test@example.com',
             password='12345',
+            first_name='Тест',
+            last_name='Тестов',
             is_active=True
         )
         self.shop = Shop.objects.create(name='Тестовый магазин')
@@ -28,14 +31,10 @@ class ShopAPITestCase(TestCase):
         )
         self.contact = Contact.objects.create(
             user=self.user,
-            last_name='Иванов',
-            first_name='Иван',
-            email='test@example.com',
-            phone='123456',
-            address='ул. Ленина, 1',
             city='Москва',
             street='Ленина',
-            house='1'
+            house='1',
+            phone='123456'
         )
 
     def test_register(self):
@@ -43,7 +42,10 @@ class ShopAPITestCase(TestCase):
             'email': 'new@example.com',
             'password': '12345',
             'first_name': 'Новый',
-            'last_name': 'Пользователь'
+            'last_name': 'Пользователь',
+            'company': 'ООО Тест',
+            'position': 'Директор',
+            'type': 'buyer'
         })
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(User.objects.filter(email='new@example.com').exists())
